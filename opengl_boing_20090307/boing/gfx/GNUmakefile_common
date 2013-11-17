@@ -1,0 +1,279 @@
+# $Id: GNUmakefile_common,v 1.61 2004/03/14 04:23:19 jimb Exp $
+# Author:	Jim E. Brooks  http://www.jimbrooks.org
+# Desc:		Common included GNU makefile.
+# Notes:	The makefile that includes this should define:
+#			TARGET_EXEC or TARGET_LIB (either)
+#			TARGET_NAME
+#			SRC_DIR
+#			OUT_DIR
+#			GFX_DIR
+#			C_SRCS
+#			H_SRCS
+#			CC_FLAGS (-I for include files, this makefile determines the other flags)
+# =============================================================================
+
+# Header file deps.
+GFX_SRC_DIR		:= $(GFX_DIR)/src
+GFX_H_SRCS      := $(GFX_SRC_DIR)/gfx_assert.h \
+                   $(GFX_SRC_DIR)/gfx_cache.h \
+                   $(GFX_SRC_DIR)/gfx_define.h \
+                   $(GFX_SRC_DIR)/gfx.h \
+                   $(GFX_SRC_DIR)/gfx_iter.h \
+                   $(GFX_SRC_DIR)/gfx_list.h \
+                   $(GFX_SRC_DIR)/gfx_math.h \
+                   $(GFX_SRC_DIR)/gfx_math_inline.h \
+                   $(GFX_SRC_DIR)/gfx_misc.h \
+                   $(GFX_SRC_DIR)/gfx_msg.h \
+                   $(GFX_SRC_DIR)/gfx_opengl.h \
+                   $(GFX_SRC_DIR)/gfx_os.h \
+                   $(GFX_SRC_DIR)/gfx_random.h \
+                   $(GFX_SRC_DIR)/gfx_rgb.h \
+                   $(GFX_SRC_DIR)/gfx_types.h \
+                   $(GFX_SRC_DIR)/gfx_typesig.h \
+                   $(GFX_SRC_DIR)/gfx_typesig_defs.h
+
+# Determine which machine platform.
+ifeq ($(MACHINE),)
+MACHINE			:= $(shell uname -s 2>/dev/null || uname)
+endif
+
+# Source file extension.
+SRC_EXT			:= .cc
+
+# Use my lint tool if available.
+LWLINT			:= $(shell $(GFX_DIR)/which-lwlint.sh)
+
+# Order dependent.
+C_OBJS			:= $(addprefix $(OUT_DIR)/,$(C_SRCS:$(SRC_EXT)=.o))
+C_SRCS			:= $(addprefix $(SRC_DIR)/,$(C_SRCS))
+H_SRCS			:= $(addprefix $(SRC_DIR)/,$(H_SRCS))
+
+# [2007/05 boing can use conservative optimizations for portability].
+#
+# Enable optimization and extra warnings.
+# -O2 and -O3 cause inaccurate vertexs on BeOS 5.
+ifeq ($(MACHINE),BeOS) # BeOS
+GCC_OPT_FLAGS	:= -O
+else
+#GCC_OPT_FLAGS	:= -O3 -ffast-math
+GCC_OPT_FLAGS	:= -O2
+endif
+# -fomit-frame-pointer inhibits debug info
+#ifneq ($(DEBUG),1)
+#GCC_OPT_FLAGS	+= -fomit-frame-pointer
+#endif
+
+# Extra warnings (gcc-3.4's new alias for it is -Wextra).
+ifeq ($(DEBUG),1)
+#GCC_WARN_FLAGS	+= -W
+endif
+# -Wstrict-prototypes is N/A to g++
+GCC_WARN_FLAGS	+= -Wall -Wshadow -Wuninitialized -Wno-non-template-friend
+
+#-------------------------------------------------------------------------------
+# Propagate variables from make cmd-line to compiler/linker (eg make DEBUG=1).
+# Note: To pass a variable to make, it must be written as an assignment with "=".
+# Eg, "make DEBUG" and "make DEBUG=1" means make the DEBUG target and DEBUG=1, resp.
+#-------------------------------------------------------------------------------
+
+# GFXSYS_OPENGL=1   (default)
+ifeq ($(GFXSYS_OPENGL),1)
+CC_FLAGS		+= -DGFXSYS_OPENGL=1
+endif
+
+# ALTVERTEX=1
+# Affects the GFX_VERTEXV() macro and slightly performance.
+ifneq ($(ALTVERTEX),)
+CC_FLAGS		+= -DALTVERTEX=1
+endif
+
+# ASSERT=0|1
+ifneq ($(ASSERT),)
+CC_FLAGS		+= -DASSERT=$(ASSERT)
+endif
+
+# PROFILE=1
+# To compile profiling support for use with gprof.
+# To yield better profile data, optimization/inlining is disabled.
+ifeq ($(PROFILE),1)
+CC_FLAGS		+= -pg -DPROFILE=1
+LD_FLAGS		+= -pg
+GCC_OPT_FLAGS	:= -O0 -fno-inline
+GCC_WARN_FLAGS	:= $(subst -Wuninitialized,,$(GCC_WARN_FLAGS))
+endif
+
+# DEBUG=1
+# DEBUG=2 excruciating
+ifeq ($(DEBUG),1)
+CC_FLAGS		+= -g -DDEBUG=$(DEBUG) -DASSERT=1
+LD_FLAGS		+= -g
+endif
+ifeq ($(DEBUG),2)
+CC_FLAGS		+= -g -DDEBUG=$(DEBUG) -DASSERT=1 -DVERBOSE=1
+LD_FLAGS		+= -g
+endif
+
+# RELEASE=1
+ifeq ($(RELEASE),1)
+CC_FLAGS		+= -DRELEASE=1 -DASSERT=0
+endif
+
+# SPEED=1
+ifeq ($(SPEED),1)
+CC_FLAGS		+= -DSPEED=1 -DRELEASE=1 -DASSERT=0 -DVERBOSE=0
+endif
+
+# V[ERBOSE]=0|1 print status or extra-verbose debug messages, controls StatusMsg()
+ifneq ($(VERBOSE),)
+CC_FLAGS		+= -DVERBOSE=$(VERBOSE)
+endif
+ifneq ($(V),)
+CC_FLAGS		+= -DVERBOSE=$(V)
+endif
+
+# FPDOUBLE=1
+# FPLONGDOUBLE=1
+# Compile single/double/extended precision floating-point instructions.
+ifeq ($(FPDOUBLE),1)
+CC_FLAGS		+= -DFPDOUBLE=1
+endif
+ifeq ($(FPLONGDOUBLE),1)
+CC_FLAGS		+= -DFPLONGDOUBLE=1
+endif
+
+# Was arch specified on make cmd-line?
+# This var will be passed to cc-config.sh
+ifneq ($(MARCH),)
+MARCH_CC_CONFIG	:= -march $(MARCH)
+endif
+
+# Was FP math option specified on make cmd-line?
+# This var will be passed to cc-config.sh
+ifneq ($(MFPMATH),)
+MFPMATH_CC_CONFIG := -mfpmath $(MFPMATH)
+endif
+
+#-------------------------------------------------------------------------------
+# OS-specific tool definitions.
+#-------------------------------------------------------------------------------
+
+# BeOS
+ifeq ($(MACHINE),BeOS)
+TOOLS_DEFINED	:= 1
+CC	 			:= g++ -c
+CC_FLAGS		:= -I. -I$(GFX_DIR)/src -I/boot/develop/headers/be/opengl $(CC_FLAGS)
+CC_FLAGS 		:= $(CC_CONFIG) $(CC_FLAGS) $(GCC_OPT_FLAGS) $(GCC_WARN_FLAGS)
+LD				:= g++
+SYS_LIBS		:= -L/boot/home/config/lib -lglut -lGL
+AR				:= ar
+AR_FLAGS		:= cr
+endif
+
+# cygwin
+ifneq (,$(findstring CYGWIN,$(MACHINE)))
+TOOLS_DEFINED	:= 1
+CC	 			:= g++ -c
+CC_FLAGS		:= $(CC_CONFIG) $(CC_FLAGS) $(GCC_OPT_FLAGS) $(GCC_WARN_FLAGS) -I. -I$(GFX_DIR)/src -D__MESA__
+LD				:= g++
+SYS_LIBS		:= -lglut32 -lglu32 -lopengl32
+AR				:= ar
+AR_FLAGS		:= cr
+endif
+
+# Mac OS X Darwin.
+ifeq ($(MACHINE),Darwin)
+TOOLS_DEFINED	:= 1
+CC	 			:= g++ -c
+CC_FLAGS		:= $(CC_CONFIG) $(CC_FLAGS) $(GCC_OPT_FLAGS) $(GCC_WARN_FLAGS) -I. -I$(GFX_DIR)/src -I/usr/X11R6/include
+LD				:= g++
+SYS_LIBS		:= -L"/System/Library/Frameworks/OpenGL.framework/Libraries" -lGL -lGLU -framework OpenGL -framework GLUT -framework foundation
+AR				:= ar
+AR_FLAGS		:= cr
+endif
+
+# GNU (default: Linux, FreeBSD, et al)
+ifeq ($(TOOLS_DEFINED),)
+TOOLS_DEFINED	:= 1
+MKDIROUT		:= $(shell mkdir -p $(OUT_DIR)) # cc-config.sh needs out/ dir made
+CC_				:= $(shell $(GFX_DIR)/which-g++.sh)
+CC_CONFIG		:= $(shell $(GFX_DIR)/cc-config.sh $(CC_) $(MARCH_CC_CONFIG) $(MFPMATH_CC_CONFIG))
+CC				:= $(CC_) -c
+#CC_FLAGS		:= $(CC_CONFIG) $(CC_FLAGS) $(GCC_OPT_FLAGS) $(GCC_WARN_FLAGS) -I. -I$(GFX_DIR)/src -D__MESA__
+CC_FLAGS		:= $(CC_CONFIG) $(CC_FLAGS) $(GCC_OPT_FLAGS) $(GCC_WARN_FLAGS) -I. -I$(GFX_DIR)/src
+LD				:= $(CC_)
+SYS_LIBS		:= -L/usr/X11/lib -L/usr/X11R6/lib -L/usr/local/lib -lglut -lGL -lGLU -lX11 -lXi
+AR				:= ar
+AR_FLAGS		:= cr
+endif
+
+# WORKAROUND:
+# -march=k6 on gcc 3.0/3.1 produces buggy code from "sim" source code.
+# -march=athlon and -m3dnow are suspected.
+CC_FLAGS		:= $(subst -march=k6,,$(CC_FLAGS))
+CC_FLAGS		:= $(subst -march=k6-2,,$(CC_FLAGS))
+CC_FLAGS		:= $(subst -march=k6-3,,$(CC_FLAGS))
+CC_FLAGS		:= $(subst -march=athlon,,$(CC_FLAGS))
+CC_FLAGS		:= $(subst -m3dnow,,$(CC_FLAGS)) # implies an AMD arch
+
+#-------------------------------------------------------------------------------
+# Rules/targets.
+#-------------------------------------------------------------------------------
+
+# All of the libs of this project.
+ifneq ($(TARGET_EXEC),)
+LIB_GFX			:= $(GFX_DIR)/out/gfx.a
+PROJECT_LIBS	+= $(LIB_GFX)
+endif
+
+all:  msg  $(OUT_DIR)  $(PROJECT_LIBS)  $(TARGET_EXEC)  $(TARGET_LIB)
+
+# Build executable.  GNU ld args are order-dependent.
+$(TARGET_EXEC):  $(C_OBJS)  $(PROJECT_LIBS)
+	$(LD) -o $(@) $(C_OBJS) $(LD_FLAGS) $(PROJECT_LIBS) $(SYS_LIBS)
+
+# Build library.
+$(TARGET_LIB):  $(C_OBJS)
+	$(AR) $(AR_FLAGS) $(@) $(C_OBJS)
+
+# Build an object file from every source file.
+$(OUT_DIR)/%.o: $(SRC_DIR)/%$(SRC_EXT)  $(H_SRCS)  $(GFX_H_SRCS)
+	$(CC) -o $@ $(CC_FLAGS) $(subst $(OUT_DIR)/,$(SRC_DIR)/,$<)
+# To build assembly files: make ASM=1
+ifneq ($(ASM),)
+	$(CC) -S -fverbose-asm -o $(subst .o,.s,$@)  $(CC_FLAGS)  $(subst $(OUT_DIR)/,$(SRC_DIR)/,$<)
+endif
+# Check lint.
+ifneq ($(LWLINT),)
+	$(LWLINT) $(subst $(OUT_DIR)/,$(SRC_DIR)/,$<)
+endif
+
+# Build any libraries (of this project) the target depends on.
+ifneq ($(TARGET_EXEC),)
+%.a:
+	$(MAKE) -C $(subst /$(OUT_DIR),/,$(@D))
+endif
+
+.PHONY: msg
+msg:
+	@echo " "
+	@echo "-- Building $(TARGET_NAME) -- "
+	@echo " "
+
+$(OUT_DIR):
+	mkdir $(OUT_DIR)
+
+depend:  $(OUT_DIR)
+	touch $(OUT_DIR)/Makefile.depend-tmp
+	makedepend  -I$(SRC_DIR)  -Y -f$(OUT_DIR)/Makefile.depend-tmp  $(C_SRCS)  2&>/dev/null
+	cat  $(OUT_DIR)/Makefile.depend-tmp  |  sed 's/$(SRC_DIR)\//$(OUT_DIR)\//'  >  $(OUT_DIR)/Makefile.depend
+	rm -f  $(OUT_DIR)/Makefile.depend-tmp.bak  $(OUT_DIR)/Makefile.depend-tmp
+
+clean_:
+	@rm -f  $(C_OBJS) $(TARGET) gmon.out core core.* *.pdb
+
+clean: clean_
+	@echo "Cleaning."
+
+realclean distclean clean-all cleanall: clean_
+	@echo "Cleaning thoroughly."
+	@rm -rf  $(OUT_DIR)/
