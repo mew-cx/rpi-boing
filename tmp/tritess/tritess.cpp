@@ -1,5 +1,4 @@
 // tritess.cpp
-// 2013-11-26
 
 #include <vector>
 #include <iostream>
@@ -10,16 +9,57 @@
 
 /////////////////////////////////////////////////////////////////////////////
 
+const double RADIUS1 = 3.7;
+const double RADIUS2 = 2.2;
+
+//const double PHI = (1+sqrt(5))/2;
+
+#if 0
+
+$fn=45;
+phi=(1+sqrt(5))/2;
+r1=2.2;
+
+union()
+{
+    color([0.2,0.2,0.2,1])
+    {
+        sphere(r=3.7);
+    }
+
+    color([0.74,0.06,0.28,1])
+    {
+        translate([ 0, 1, phi]) sphere(r1);
+        translate([ 0, 1,-phi]) sphere(r1);
+        translate([ 0,-1, phi]) sphere(r1);
+        translate([ 0,-1,-phi]) sphere(r1);
+
+        translate([ 1, phi, 0]) sphere(r1);
+        translate([ 1,-phi, 0]) sphere(r1);
+        translate([-1, phi, 0]) sphere(r1);
+        translate([-1,-phi, 0]) sphere(r1);
+
+        translate([ phi, 0, 1]) sphere(r1);
+        translate([-phi, 0, 1]) sphere(r1);
+        translate([ phi, 0,-1]) sphere(r1);
+        translate([-phi, 0,-1]) sphere(r1);
+    }
+}
+
+#endif
+
+/////////////////////////////////////////////////////////////////////////////
+
 class Vec3
 {
 public:
-    Vec3( double a=0 ) : _x(a), _y(a), _z(a) {}
+    Vec3() : _x(0), _y(0), _z(0) {}
     Vec3( double x, double y, double z ) : _x(x), _y(y), _z(z) {}
     ~Vec3() {}
 
-    //double x() const { return _x; }
-    //double y() const { return _y; }
-    //double z() const { return _z; }
+    double x() const { return _x; }
+    double y() const { return _y; }
+    double z() const { return _z; }
 
     const Vec3 operator+( const Vec3& rhs ) const;
     const Vec3 operator-( const Vec3& rhs ) const;
@@ -107,7 +147,7 @@ public:
 
     void subdivide( const Tri& t, size_t level );
 
-    void print() const;
+    void printOSG() const;
 
 private:
     Vec3 _origin;
@@ -156,7 +196,7 @@ const Vec3 TriList::spherize( const Vec3& v ) const
 }
 
 
-void TriList::print() const
+void TriList::printOSG() const
 {
     std::cout << "Geode {" << std::endl;
     std::cout << "  Geometry {" << std::endl;
@@ -176,26 +216,16 @@ int main( int argc, char* argv[] )
 {
     TriList tl;
 
-    if(0)
     {
         tl.setOrigin( Vec3(0,0,0) );
         tl.setRadius( 1 );
-        const Vec3 a( tl.spherize( Vec3(2,0,0) ) );
-        const Vec3 b( tl.spherize( Vec3(0,3,0) ) );
-        const Vec3 c( tl.spherize( Vec3(0,0,4) ) );
+        const Vec3 a( tl.spherize( Vec3(1,0,0) ) );
+        const Vec3 b( tl.spherize( Vec3(0,1,0) ) );
+        const Vec3 c( tl.spherize( Vec3(0,0,1) ) );
         tl.subdivide( Tri(a,b,c), 6 );
     }
 
-    {
-        tl.setOrigin( Vec3(0,2.4,2) );
-        tl.setRadius( 0.5 );
-        const Vec3 a( tl.spherize( Vec3(2,0,0) ) );
-        const Vec3 b( tl.spherize( Vec3(0,3,0) ) );
-        const Vec3 c( tl.spherize( Vec3(0,0,4) ) );
-        tl.subdivide( Tri(a,b,c), 6 );
-    }
-
-    tl.print();
+    tl.printOSG();
 }
 
 
